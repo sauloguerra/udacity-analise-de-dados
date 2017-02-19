@@ -1,0 +1,148 @@
+---
+title: "P1: Testando um Fenômeno de Percepção"
+author: "Saulo de Souza Guerra Ferreira de Castro"
+date: "13 de janeiro de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Estatística: A Ciência das Escolhas
+
+A especificação detalhada do projeto pode ser encontrada no seguinte link:
+https://docs.google.com/document/d/10g8o19RnFlT5YujBS3c6FbJ_qooOODlXWAbLR8rnAAY/edit
+
+### Questões para Investigação
+
+#### Qual é a nossa variável independente? Qual é a nossa variável dependente?
+
+A variável independente é tipo do conjunto de palavras lidas (condição), que pode ser congruente ou incongruente.
+
+Já a variável dependente é o tempo de resposta para identificar a cor do conjunto de palavras.
+
+#### Qual seria um conjunto apropriado de hipóteses para essa tarefa? Que tipo de teste estatístico você espera executar? Justifique suas escolhas.
+
+Considerando que uma das teorias por trás do teste sugere que o cérebro leva menos tempo reconhecendo padrões de palavras do que reconhecendo padrões de cores, podemos nos perguntar se o tempo médio de resposta no teste das palavras incongruentes é maior do que das palavras congruentes, ou se o tempo médio não apresenta diferenças em relação ao teste das palavras congruentes. Portanto, considerando que:
+
+* µc é o tempo médio de resposta dos participantes no teste com o conjunto de palavras congruentes
+* µi é o tempo médio de resposta dos participantes no teste com o conjunto de palavras incongruentes
+
+Podemos definir as seguintes hipóteses em função da diferença das médias:
+
+* `H0: µc - µi = 0` (não há diferença entre os tempos médios)
+* `HA: µc - µi < 0` (a diferença entre os tempos médios é menor que zero)
+
+Para verificar as hipóteses, será necessário um **teste unicaldal**, pois a hipótese alternativa é de que a diferença do tempo médio na condição congruente e da condição incongruente seria menor do que zero, ou seja, o tempo médio na condição incongruente é maior do que na condição congruente. 
+
+No presente caso, não temos os parâmetros da população, apenas de amostras de ambos os casos (congruentes e incongruentes). Sendo assim, por compararmos amostras, é mais adequado o **uso do teste T**. 
+
+Por se tratar de duas amostras para condições diferentes, **usaremos o teste T pareado para amostras dependentes.**
+
+#### Reporte alguma estatística descritiva em relação a esse conjunto de dados. Inclua, pelo menos, uma medida de tendência central de pelo menos uma medida de variabilidade.
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+setwd("~/Development/Udacity")
+```
+
+Tabela com estatísticas descritivas:
+
+```{r}
+dados <- read.csv('P1-data.csv') %>% 
+  gather(condicao, tempo) 
+
+estatisticas.descritivas <- dados %>% 
+  group_by(condicao) %>% 
+  summarise(n = n(),
+            mediana = median(tempo),
+            media = mean(tempo),
+            desvio_padrao = sd(tempo),
+            variancia = var(tempo))
+
+estatisticas.descritivas
+```
+
+#### Forneça uma ou duas visualizações que mostre a distribuição da amostra de dados. Escreva uma ou duas sentenças sobre o que você observou do gráfico ou gráficos.
+
+No gráfico de boxplot podemos observar a visível diferença entre as medianas. Observamos também a ocorrência de possíveis outliers nos tempos na condição incongruente.
+
+Já no histograma e no gráfico de densidade, podemos observar uma visível separação entre as médias das amostras, o que nos sugere que o tempo de resposta na condição incongruente possa ser significativamente maior.
+
+```{r}
+
+ggplot(dados, aes(y = tempo, x = condicao, fill = condicao)) + 
+  geom_boxplot(outlier.colour = 'red') + 
+  ggtitle("Boxplot: congruentes e incongruentes")
+
+ggplot(dados, aes(x = tempo, fill = condicao)) + 
+  geom_histogram(bins = 12, alpha = 0.5, aes(y = ..density..), position = 'identity') + 
+  ggtitle("Histograma: congruentes e incongruentes")
+
+ggplot(dados, aes(x = tempo, fill = condicao)) + 
+  geom_density(alpha = 0.5) + 
+  ggtitle("Densidade: congruentes e incongruentes")
+
+```
+
+#### Agora desempenhe o teste estatístico e reporte seus resultados. Qual seu nível de confiança e o valor estatístico crítico? Você rejeitou a hipótese nula ou falhou ao tentar rejeitá-la? Encontre uma conclusão em relação ao experimento da tarefa. Os resultados estão de acordo com suas expectativas?
+
+Os testes serão realizados considerando intervalo de confiança de 95% (`α = 0.05`). Tendo a amostra com `23 graus de liberdade`, temos um t crítico para teste unicaldal de -1.714 (à esquerda pois HA: µc - µi < 0).
+
+```{r}
+dados <- read.csv('P1-data.csv')
+
+calculo <- dados %>% 
+  mutate(diferenca = Congruent - Incongruent) %>% 
+  select(diferenca) %>% 
+  summarise(desvio_dif = sd(diferenca),
+            media_dif = mean(diferenca),
+            graus_liberdade = n()-1,
+            erro_padrao_dif = desvio_dif/sqrt(n()),
+            t = (media_dif - 0)/erro_padrao_dif)
+
+calculo
+```
+
+Como resultado, temos a estatística `t = -8.021`, muito mais à esquerda que o `t crítico = -1.714`, o que nos permite rejeitar a hipótese nula de que µc - µi = 0.
+
+Portanto, é possível afirmar (estatísticamente significante com nível de significância de 0.05) que os testes realizados com o grupo de palavras na condição incongruente levam mais tempo, em média `7.965` segundos, do que os teste realizados com o grupo na condição congruente. Em outras palavras, o tempo de resposta da condição congruente é menor do que da condição incongruente, conforme esperado pela teoria do esfeito stroop.
+
+Para validar os resultados, os testes serão repetidos utilizando a função `t.test` do R, com os seguintes parâmetros:
+
+* Por ser um t-test pareado, será avaliada a diferença das médias dos tempos da condição congruente e incongruente: `x = dados$Congruent, y = dados$Incongruent`
+* Por ser um teste unicaldal (à esquerda), a hipotese alternativa é se a diferença é menor que zero: `alternative = "less"`
+* A hipótese nula considera que a diferença das médias seria zero: `mu = 0`
+* O tipo do t-teste é pareado: `paired = TRUE`
+* O intervalo de confiança escolhido é de 95%: `conf.level = .95`
+
+```{r}
+t.test(x = dados$Congruent, y = dados$Incongruent,
+        alternative = "less", 
+        mu = 0, 
+        paired = TRUE, 
+        conf.level = 0.95)
+```
+
+Percebe-se que os resultados são os mesmos. Desse cáclulo podemos avaliar ainda o p-valor bastante baixo, corroborando a decisão de rejeitar a hipótese nula. 
+
+#### Opcional: O que você acha que é responsável pelo efeito observado? Consegue pensar em uma alternativa ou tarefa similar que resultaria em um efeito parecido?
+
+Segundo o artigo sobre efeito stroop na wikipedia, há algumas teorias que tenta explicar o fenômeno:
+
+* Velocidade de processamento: a velocidade de processamento do cérebro é maior para reconhecimento de palavras do que cores
+* Atenção seletiva: o reconhecimento de cores requer mais atenção do que reconhecimento de palavras
+* Automaticidade: como resultado habitual da leitura, o cérebro automaticamente reconhece primeiro o padrão de palavras do que o padrão de cores.
+
+### Referências
+
+[Stroop Effect](https://en.wikipedia.org/wiki/Stroop_effect)
+
+[Valor-p](https://pt.wikipedia.org/wiki/Valor-p)
+
+[Teste t de Student](https://pt.wikipedia.org/wiki/Teste_t_de_Student)
+
+
